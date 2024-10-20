@@ -17,7 +17,7 @@ mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 }).then(() => console.log("MongoDB connected"))
-.catch(err => console.error("MongoDB connection error:", err));
+  .catch(err => console.error("MongoDB connection error:", err));
 
 // Cache Schema
 const CacheSchema = new mongoose.Schema({
@@ -38,6 +38,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Helper functions for external API results
 async function getStackOverflowResults(query) {
   const response = await axios.get(`https://api.stackexchange.com/2.3/search/advanced`, {
     params: {
@@ -51,7 +52,6 @@ async function getStackOverflowResults(query) {
   return response.data.items;
 }
 
-// Reddit API helper
 async function getRedditResults(query) {
   const response = await axios.get(`https://www.reddit.com/search.json`, {
     params: {
@@ -69,19 +69,26 @@ async function getRedditResults(query) {
 // Search endpoint
 app.post('/api/search', async (req, res) => {
   try {
-    const { query,language } = req.body;
+    let { query } = req.body;
+    
+    // Ensure the query is a string and normalize it
+    if (typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({ error: 'Invalid search query' });
+    }
 
-    // Check cache first
-    const cachedResults = await Cache.findOne({
-      query,
-      expiresAt: { $gt: new Date() }
-    });
+    query = query.trim().toLowerCase(); // Normalize query to lowercase
+
+    // Check cache for existing results
+    const cachedResults = await Cache.findOne({ query, expiresAt: { $gt: new Date() } });
 
     if (cachedResults) {
+      console.log(`Cache hit for query: "${query}"`);
       return res.json(cachedResults.results);
     }
 
-    // Fetch new results
+    console.log(`Cache miss for query: "${query}". Fetching new data...`);
+
+    // Fetch new results if not in cache
     const [stackOverflowResults, redditResults] = await Promise.all([
       getStackOverflowResults(query),
       getRedditResults(query)
@@ -92,17 +99,17 @@ app.post('/api/search', async (req, res) => {
       reddit: redditResults
     };
 
-    // Cache results for 1 hour
+    // Save new search results to cache (expires in 1 hour)
     const cacheEntry = new Cache({
       query,
       results: combinedResults,
-      expiresAt: new Date(Date.now() + 3600000)
+      expiresAt: new Date(Date.now() + 3600000) // Cache expiration set to 1 hour
     });
     await cacheEntry.save();
 
     res.json(combinedResults);
   } catch (error) {
-    console.error(error);
+    console.error('Error fetching search results:', error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -126,12 +133,12 @@ app.post('/api/email-results', async (req, res) => {
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Email sent successfully' });
   } catch (error) {
-    console.error(error);
+    console.error('Error sending email:', error.message);
     res.status(500).json({ error: 'Failed to send email' });
   }
 });
 
-
+// Generate HTML template for email
 function generateEmailTemplate(results, query) {
   const stackOverflowResults = Array.isArray(results.stackoverflow) ? results.stackoverflow : [];
   const redditResults = Array.isArray(results.reddit) ? results.reddit : [];
@@ -157,7 +164,6 @@ function generateEmailTemplate(results, query) {
     </div>
   `;
 }
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

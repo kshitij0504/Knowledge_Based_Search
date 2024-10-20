@@ -69,7 +69,7 @@ async function getRedditResults(query) {
 // Search endpoint
 app.post('/api/search', async (req, res) => {
   try {
-    const { query } = req.body;
+    const { query,language } = req.body;
 
     // Check cache first
     const cachedResults = await Cache.findOne({

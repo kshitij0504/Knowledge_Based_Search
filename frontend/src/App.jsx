@@ -115,7 +115,7 @@ function App() {
 
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost:5000/api/search", {
+      const response = await axios.post("https://knowledge-based-search.onrender.com/api/search", {
         query: query.trim(),
       });
 
@@ -169,7 +169,7 @@ function App() {
         throw new Error("Invalid email format");
       }
 
-      await axios.post("http://localhost:5000/api/email-results", {
+      await axios.post("https://knowledge-based-search.onrender.com/api/email-results", {
         email,
         results,
         query,
@@ -266,7 +266,6 @@ function App() {
             </Tooltip>
           </Box>
 
-          {/* Search Section */}
           <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, borderRadius: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <TextField

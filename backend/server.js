@@ -69,7 +69,7 @@ async function getRedditResults(query) {
 // Search endpoint
 app.post('/api/search', async (req, res) => {
   try {
-    const { query, language } = req.body;
+    const { query } = req.body;
 
     // Check cache first
     const cachedResults = await Cache.findOne({
@@ -112,6 +112,10 @@ app.post('/api/email-results', async (req, res) => {
   try {
     const { email, results, query } = req.body;
 
+    if (!results || !results.stackoverflow || !results.reddit) {
+      return res.status(400).json({ error: 'Invalid results format' });
+    }
+
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
@@ -127,21 +131,24 @@ app.post('/api/email-results', async (req, res) => {
   }
 });
 
+
 function generateEmailTemplate(results, query) {
-  // Generate HTML email template with search results
+  const stackOverflowResults = Array.isArray(results.stackoverflow) ? results.stackoverflow : [];
+  const redditResults = Array.isArray(results.reddit) ? results.reddit : [];
+
   return `
     <h2>Search Results for: ${query}</h2>
     <div>
       <h3>Stack Overflow Results:</h3>
-      ${results.stackoverflow.map(item => `
+      ${stackOverflowResults.map(item => `
         <div>
           <h4><a href="${item.link}">${item.title}</a></h4>
           <p>Score: ${item.score}</p>
         </div>
       `).join('')}
-      
+
       <h3>Reddit Results:</h3>
-      ${results.reddit.map(item => `
+      ${redditResults.map(item => `
         <div>
           <h4><a href="https://reddit.com${item.data.permalink}">${item.data.title}</a></h4>
           <p>Score: ${item.data.score}</p>
@@ -150,6 +157,7 @@ function generateEmailTemplate(results, query) {
     </div>
   `;
 }
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
